@@ -34,3 +34,36 @@ Execute the program directly from the file installed in the previous step, or ru
     stack exec pagerenc -- [flags]
 
 to execute it from the project directory.
+
+#Usage
+
+pagerenc reads a series of commands from STDIN and writes 16-bit PCM output to
+STDOUT at a sample rate of 22050 Hz.
+
+Each line may either contain a message to be encoded in a specific format, or
+a delay command to insert noise of a specified duration. Valid formats are
+POCSAG512, POCSAG1200, POCSAG2400, and FLEX. Messages are in the format of
+PROTOCOL:ADDRESS:MESSAGE
+
+Here's an example.
+
+    FLEX:1:Hello
+    FLEX:2:Word
+    WAIT
+    POCSAG512:30:Some pocsag512 message
+    POCSAG2400:35:Some pocsag2400 message
+    WAIT 30
+    POCSAG1200:8:Some pocsag1200 message
+
+POCSAG messages have a delay autmatically inserted after them, while FLEX
+messages do not, due to the multimon FLEX encoder relying on FLEX messages
+being aligned next to eachother to decode properly. Additionally, multimon will
+not decode the first FLEX message sent in a batch of FLEX messages. It uses the
+first message to synchronize the decoder, and so it can't decode the message.
+
+When WAIT is not provided any parameters, it will insert a random delay between
+MINDELAY and MAXDELAY, specifiable with command line flags. The default min and
+max delay are 1 and 10 seconds respectively.
+
+The --throttle flag will cause pagerenc to output audio data as if it was being
+decoded in real time from a radio.
