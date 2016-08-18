@@ -1,0 +1,28 @@
+name:                pagerenc
+version:             0.1.0.0
+synopsis:            Encode fake pager messages for multimon-ng
+description:         Please see README.md
+homepage:            https://github.com/unknownloner/pagerenc#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Galen Alderson
+maintainer:          galen.alderson@gmail.com
+copyright:           2016 Galen Alderson
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable pagerenc
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
+                     , bytestring
+                     , random
+                     , optparse-applicative
+  other-modules:       Data.BitsExtra
+                     , Data.CRC
+                     , Data.Chunks
+                     , Data.FLEX
+                     , Data.PCM
+                     , Data.POCSAG
