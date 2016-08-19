@@ -17,12 +17,6 @@ data Options = Options
     , optMaxDelay :: Double
     } 
 
-defaultOptions = 
-    Options
-    { optThrottle = False
-    , optMinDelay = 1
-    , optMaxDelay = 10
-    }
 options :: Parser Options
 options = 
     Options <$>
