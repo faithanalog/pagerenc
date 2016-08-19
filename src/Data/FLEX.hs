@@ -98,7 +98,7 @@ idle :: [Codeword]
 -- We switch between a positive and negative idle because
 -- multimon will believe it lost its lock if data does not have a zero
 -- crossing within a certain timeframe
-idle = concat (repeat [codeword 0x1FFFFF, codeword 0])
+idle = cycle [codeword 0x1FFFFF, codeword 0]
 
 transmission :: Word32 -> String -> ByteString
 transmission addr txt = 
