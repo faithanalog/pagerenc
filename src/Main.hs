@@ -54,7 +54,10 @@ message = wait <|> msg
         pure (FLEX.transmission, 1600, False)
     pocsag = do
         string "POCSAG"
-        baud <- fromIntegral <$> integer
+        baud <- 
+            choice
+                [ string (show x) *> pure x
+                | x <- [512, 1200, 2400] ]
         pure (POCSAG.transmission, baud, True)
 
 messages :: Parser [Message]
