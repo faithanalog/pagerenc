@@ -6,40 +6,22 @@ import Data.PCM
 import Data.FLEX as FLEX
 import Data.POCSAG as POCSAG
 import Data.ByteString.Lazy (ByteString)
+import Data.Scientific
 import System.IO
 import System.Random
 import Control.Monad
-import Options.Applicative as Opt hiding (Failure, Success)
+import Options.Applicative hiding (Failure, Success, Parser)
+import qualified Options.Applicative as Opt
 
-import Text.Trifecta as P hiding (option)
-import Text.PrettyPrint.ANSI.Leijen (renderPretty, displayIO, linebreak)
+import Text.Megaparsec hiding (option, Message)
+import Text.Megaparsec.String
+import Text.Megaparsec.Lexer hiding (space)
 
 data Options = Options
     { optThrottle :: Bool
     , optMinDelay :: Double
     , optMaxDelay :: Double
     } 
-
-options :: Opt.Parser Options
-options = 
-    Options <$>
-    switch
-        (long "throttle" <>
-         help "Throttle data output to 22050Hz, causing 'realtime' playback.") <*>
-    option
-        auto
-        (long "mindelay" <>
-         help "Set minimum delay between messages in seconds." <>
-         metavar "NUM" <>
-         value 1.0 <>
-         showDefault) <*>
-    option
-        auto
-        (long "maxdelay" <>
-         help "Set maximum delay between messages in seconds." <>
-         metavar "NUM" <>
-         value 10.0 <>
-         showDefault)
 
 -- multimon-ng's input sample rate
 outRate = SampleRate 22050
@@ -54,46 +36,48 @@ data Message = Transmission ByteString Bool | Delay Double | RandDelay
 -- FORMAT:ADDRESS:MESSAGE
 -- WAIT
 -- WAIT <LENGTH>
-message :: P.Parser Message
+message :: Parser Message
 message = wait <|> msg
   where
+    wait :: Parser Message
     wait = do
-        try $ text "WAIT"
-        space <- optional $ oneOf " \t"
-        case space of
+        let sepChars = [' ', '\t']
+        try $ string "WAIT"
+        sep <- optional $ oneOf sepChars
+        case sep of
             Nothing -> pure RandDelay
             Just s -> 
-                whiteSpace *>
-                (Delay . either fromIntegral id <$> naturalOrDouble)
+                skipMany (oneOf sepChars) *>
+                (Delay . toRealFloat <$> number)
+    msg :: Parser Message
     msg = do
         (tr,bd,delay) <- flex <|> pocsag
         char ':'
-        address <- fromIntegral <$> decimal
+        address <- fromIntegral <$> integer
         char ':'
-        message <- many (noneOf "\r\n")
+        message <- many (noneOf ['\r', '\n'])
         pure $
             Transmission
                 (pcmEncode outRate (BaudRate bd) (tr address message))
                 delay
     flex = do
-        text "FLEX"
+        string "FLEX"
         pure (FLEX.transmission, 1600, False)
     pocsag = do
-        text "POCSAG"
-        baud <- fromIntegral <$> decimal
+        string "POCSAG"
+        baud <- fromIntegral <$> integer
         pure (POCSAG.transmission, baud, True)
 
-messages :: P.Parser [Message]
-messages = whiteSpace *> manyTill (message <* whiteSpace) eof
+messages :: Parser [Message]
+messages = space *> manyTill (message <* space) eof
 
 encodeMessages :: Options -> IO ()
 encodeMessages opts = do
     input <- getContents
-    let ms' :: Result [Message]
-        ms' = parseString messages mempty input
+    let ms' = parse messages "" input
     case ms' of
-        Failure err -> displayIO stderr $ renderPretty 0.8 80 $ err <> linebreak
-        Success ms -> mapM_ execMessage ms
+        Left err -> hPutStrLn stderr $ parseErrorPretty err
+        Right ms -> mapM_ execMessage ms
   where
     execMessage (Transmission bs delay) = 
         put bs >> when delay (execMessage RandDelay)
@@ -119,3 +103,24 @@ main = execParser opts >>= encodeMessages
         "Reads lines from stdin, outputting POCSAG or FLEX data to stdout\
         \ which is decodable by multimon-ng. Additionally, insert delays\
         \ between messages to simulate staggered broadcasts."
+
+options :: Opt.Parser Options
+options = 
+    Options <$>
+    switch
+        (long "throttle" <>
+         help "Throttle data output to 22050Hz, causing 'realtime' playback.") <*>
+    option
+        auto
+        (long "mindelay" <>
+         help "Set minimum delay between messages in seconds." <>
+         metavar "NUM" <>
+         value 1.0 <>
+         showDefault) <*>
+    option
+        auto
+        (long "maxdelay" <>
+         help "Set maximum delay between messages in seconds." <>
+         metavar "NUM" <>
+         value 10.0 <>
+         showDefault)
