@@ -70,7 +70,8 @@ throttledPut (SampleRate sr) samples = do
     let chunkSize = 4096
         -- (1000000 us / sec) * (1 sec / sr smpls) * (chunkSize smpls / chunk)
         sleepTime = 1000000 * chunkSize `div` sr
-        chunks = chunksOfB (fromIntegral chunkSize) samples
+        -- chunkSize * 2 because each sample is 2 bytes
+        chunks = chunksOfB (fromIntegral (chunkSize * 2)) samples
     forM_ chunks $ \xs -> do
         unthrottledPut xs
         hFlush stdout

@@ -16,6 +16,7 @@ import qualified Options.Applicative as Opt
 import Text.Megaparsec hiding (option, Message)
 import Text.Megaparsec.String
 import Text.Megaparsec.Lexer hiding (space)
+import qualified Text.Megaparsec as P
 
 data Options = Options
     { optThrottle :: Bool
@@ -41,14 +42,9 @@ message = wait <|> msg
   where
     wait :: Parser Message
     wait = do
-        let sepChars = [' ', '\t']
         try $ string "WAIT"
-        sep <- optional $ oneOf sepChars
-        case sep of
-            Nothing -> pure RandDelay
-            Just s -> 
-                skipMany (oneOf sepChars) *>
-                (Delay . toRealFloat <$> number)
+        many $ oneOf [' ', '\t']
+        P.option RandDelay (Delay . toRealFloat <$> number)
     msg :: Parser Message
     msg = do
         (tr,bd,delay) <- flex <|> pocsag
