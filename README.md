@@ -48,7 +48,7 @@ format of PROTOCOL:ADDRESS:MESSAGE
 Here's an example.
 
     FLEX:1:Hello
-    FLEX:2:Word
+    FLEX:2:World
     WAIT
     POCSAG512:30:Some pocsag512 message
     POCSAG2400:35:Some pocsag2400 message
