@@ -18,6 +18,8 @@ executable pagerenc
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
                      , bytestring
+                     , text
+                     , attoparsec
                      , random
                      , optparse-applicative
   other-modules:       Data.BitsExtra
