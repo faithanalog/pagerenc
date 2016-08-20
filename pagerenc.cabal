@@ -22,6 +22,8 @@ executable pagerenc
                      , attoparsec
                      , random
                      , optparse-applicative
+                     , trifecta
+                     , ansi-wl-pprint
   other-modules:       Data.BitsExtra
                      , Data.CRC
                      , Data.Chunks

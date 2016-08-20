@@ -3,17 +3,16 @@ module Main where
 
 import Data.List
 import Data.PCM
-import qualified Data.FLEX as FLEX
-import qualified Data.POCSAG as POCSAG
-import qualified Data.ByteString.Lazy as B
+import Data.FLEX as FLEX
+import Data.POCSAG as POCSAG
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import Data.Attoparsec.Text.Lazy as Atto hiding (take, option)
 import System.IO
 import System.Random
 import Control.Monad
-import Options.Applicative as Opt
+import Options.Applicative as Opt hiding (Failure, Success)
+
+import Text.Trifecta as P hiding (option)
+import Text.PrettyPrint.ANSI.Leijen (renderPretty, displayIO, linebreak)
 
 data Options = Options
     { optThrottle :: Bool
@@ -55,38 +54,46 @@ data Message = Transmission ByteString Bool | Delay Double | RandDelay
 -- FORMAT:ADDRESS:MESSAGE
 -- WAIT
 -- WAIT <LENGTH>
-message :: Atto.Parser Message
+message :: P.Parser Message
 message = wait <|> msg
   where
     wait = do
-        "WAIT"
-        space <- peekChar
+        try $ text "WAIT"
+        space <- optional $ oneOf " \t"
         case space of
-            Just ' ' -> Delay <$> double
-            _ -> pure RandDelay
+            Nothing -> pure RandDelay
+            Just s -> 
+                whiteSpace *>
+                (Delay . either fromIntegral id <$> naturalOrDouble)
     msg = do
         (tr,bd,delay) <- flex <|> pocsag
         char ':'
-        address <- decimal
+        address <- fromIntegral <$> decimal
         char ':'
-        message <- T.unpack <$> takeTill isEndOfLine
+        message <- many (noneOf "\r\n")
         pure $
             Transmission
                 (pcmEncode outRate (BaudRate bd) (tr address message))
                 delay
-    flex = "FLEX" *> pure (FLEX.transmission, 1600, False)
+    flex = do
+        text "FLEX"
+        pure (FLEX.transmission, 1600, False)
     pocsag = do
-        "POCSAG"
-        baud <- decimal
+        text "POCSAG"
+        baud <- fromIntegral <$> decimal
         pure (POCSAG.transmission, baud, True)
 
-messages :: Atto.Parser [Message]
-messages = skipSpace *> manyTill (message <* skipSpace) endOfInput
+messages :: P.Parser [Message]
+messages = whiteSpace *> manyTill (message <* whiteSpace) eof
 
 encodeMessages :: Options -> IO ()
 encodeMessages opts = do
-    input <- T.getContents
-    either (hPutStrLn stderr) (mapM_ execMessage) (parseOnly messages input)
+    input <- getContents
+    let ms' :: Result [Message]
+        ms' = parseString messages mempty input
+    case ms' of
+        Failure err -> displayIO stderr $ renderPretty 0.8 80 $ err <> linebreak
+        Success ms -> mapM_ execMessage ms
   where
     execMessage (Transmission bs delay) = 
         put bs >> when delay (execMessage RandDelay)
