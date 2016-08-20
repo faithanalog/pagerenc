@@ -17,12 +17,6 @@ import Text.Megaparsec.String
 import Text.Megaparsec.Lexer hiding (space)
 import qualified Text.Megaparsec as P
 
-data Options = Options
-    { optThrottle :: Bool
-    , optMinDelay :: Double
-    , optMaxDelay :: Double
-    } 
-
 -- multimon-ng's input sample rate
 outRate = SampleRate 22050
 
@@ -65,6 +59,12 @@ message = wait <|> msg
 
 messages :: Parser [Message]
 messages = space *> manyTill (message <* space) eof
+
+data Options = Options
+    { optThrottle :: Bool
+    , optMinDelay :: Double
+    , optMaxDelay :: Double
+    } 
 
 encodeMessages :: Options -> IO ()
 encodeMessages opts = do
