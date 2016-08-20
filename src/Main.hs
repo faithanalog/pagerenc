@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Data.List
@@ -43,7 +42,7 @@ message = wait <|> msg
     wait :: Parser Message
     wait = do
         try $ string "WAIT"
-        many $ oneOf [' ', '\t']
+        many $ oneOf " \t"
         P.option RandDelay (Delay . toRealFloat <$> number)
     msg :: Parser Message
     msg = do
@@ -51,7 +50,7 @@ message = wait <|> msg
         char ':'
         address <- fromIntegral <$> integer
         char ':'
-        message <- many (noneOf ['\r', '\n'])
+        message <- many (noneOf "\r\n")
         pure $
             Transmission
                 (pcmEncode outRate (BaudRate bd) (tr address message))
