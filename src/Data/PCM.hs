@@ -1,26 +1,28 @@
 module Data.PCM
-  (pcmEncode
-  ,noise
-  ,noiseIO
-  ,throttledPut
-  ,unthrottledPut
-  ,SampleRate(..)
-  ,BaudRate(..))
-  where
+  ( pcmEncode
+  , noise
+  , noiseIO
+  , throttledPut
+  , unthrottledPut
+  , SampleRate(..)
+  , BaudRate(..)
+  ) where
 
-import Data.BitsExtra
-import Data.Chunks
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.Builder as B
-import Data.ByteString.Lazy (ByteString)
-import Data.ByteString.Builder (Builder)
-import System.IO
-import System.Random
 import Control.Concurrent
 import Control.Monad
+import Data.BitsExtra
+import qualified Data.ByteString.Builder as B
+import Data.ByteString.Builder (Builder)
+import qualified Data.ByteString.Lazy as B
+import Data.ByteString.Lazy (ByteString)
+import System.IO
+import System.Random
 
-newtype SampleRate = SampleRate Int
-newtype BaudRate = BaudRate Int
+newtype SampleRate =
+  SampleRate Int
+
+newtype BaudRate =
+  BaudRate Int
 
 -- Resample using a nearest-neighbor algorithm
 resample :: SampleRate -> SampleRate -> [a] -> [a]
@@ -35,11 +37,11 @@ resample (SampleRate src) (SampleRate dst) = go 0 0
 
 -- Encode data as a series of 2-level PCM samples
 pcmEncode :: SampleRate -> BaudRate -> ByteString -> ByteString
-pcmEncode (SampleRate sr) (BaudRate br) = 
-    B.toLazyByteString .
-    mconcat .
-    resample (SampleRate symRate) (SampleRate sr) .
-    concatMap encodeWord . B.unpack
+pcmEncode (SampleRate sr) (BaudRate br) =
+  B.toLazyByteString .
+  mconcat .
+  resample (SampleRate symRate) (SampleRate sr) .
+  concatMap encodeWord . B.unpack
   where
     symRate = 38400
     sampleFor True = -maxBound
@@ -52,30 +54,37 @@ pcmEncode (SampleRate sr) (BaudRate br) =
 -- Generate random noise. This is used instead of pure silence because
 -- multimon-ng detects silence as if it was a signal, while it ignores noise
 noise :: RandomGen g => SampleRate -> Double -> Double -> g -> ByteString
-noise (SampleRate sr) amplitude duration = 
-    B.toLazyByteString . mconcat . map B.int16LE . samples
+noise (SampleRate sr) amplitude duration =
+  B.toLazyByteString . mconcat . map B.int16LE . samples
   where
-    hi = floor (amplitude * 32767)
+    hi = floor $ amplitude * 32767
     lo = -hi
-    len = round (duration * fromIntegral sr)
+    len = round $ duration * fromIntegral sr
     samples = take len . randomRs (lo, hi)
 
 noiseIO :: SampleRate -> Double -> Double -> IO ByteString
 noiseIO sr a d = noise sr a d <$> newStdGen
 
 -- Limits the rate at which samples are calculated to yield data as if it was
--- being FM decoded in real time.
+-- being FM decoded in real time. This does technically output slightly slower
+-- than it should, because write-time is not accounted for when calculating
+-- sleep delays.
 throttledPut :: SampleRate -> ByteString -> IO ()
 throttledPut (SampleRate sr) samples = do
-    let chunkSize = 4096
-        -- (1000000 us / sec) * (1 sec / sr smpls) * (chunkSize smpls / chunk)
-        sleepTime = 1000000 * chunkSize `div` sr
-        -- chunkSize * 2 because each sample is 2 bytes
-        chunks = chunksOfB (fromIntegral (chunkSize * 2)) samples
-    forM_ chunks $ \xs -> do
-        unthrottledPut xs
-        hFlush stdout
-        threadDelay sleepTime
+  let chunkSize = 4096
+      -- (1000000 us / sec) * (1 sec / sr smpls) * (chunkSize smpls / chunk)
+      sleepTime = 1000000 * chunkSize `div` sr
+      -- chunkSize * 2 because each sample is 2 bytes
+      chunks = chunksOfB (fromIntegral $ chunkSize * 2) samples
+      chunksOfB n xs
+        | B.null t = [xs]
+        | otherwise = h : chunksOfB n t
+        where
+          (h, t) = B.splitAt n xs
+  forM_ chunks $ \xs -> do
+    unthrottledPut xs
+    hFlush stdout
+    threadDelay sleepTime
 
 -- Output samples as fast as we can
 unthrottledPut :: ByteString -> IO ()
