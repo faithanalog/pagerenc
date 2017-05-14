@@ -11,8 +11,8 @@ details.
 
 Then, from the project root folder:
 
-    stack setup    ##Downloads/installs the Haskell compiler if needed
-    stack build    ##Recursively build the project and all dependencies
+    stack setup    # Downloads/installs the Haskell compiler if needed
+    stack build    # Recursively build the project and all dependencies
 
 
 ## Installing
