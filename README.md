@@ -4,18 +4,18 @@ POCSAG/FLEX encoder written in Haskell for fun. Check out
 https://github.com/unknownloner/pocsag-encoder for a more thoroughly documented
 implementation of a POCSAG encoder.
 
-# Building
+## Building
 
 First, install the stack build tool. See https://www.haskellstack.org/ for
 details.
 
 Then, from the project root folder:
 
-    stack setup    #Downloads/installs the Haskell compiler if needed
-    stack build    #Recursively build the project and all dependencies
+    stack setup    ##Downloads/installs the Haskell compiler if needed
+    stack build    ##Recursively build the project and all dependencies
 
 
-# Installing
+## Installing
 
 Stack will tell you what folder the executable file is located. For example:
 
@@ -27,7 +27,7 @@ You may either copy the file from that folder to wherever you want, or run
 
 to automatically install the executable in $HOME/.local/bin    
 
-# Running
+## Running
 
 Execute the program directly from the file installed in the previous step, or run
 
@@ -35,7 +35,7 @@ Execute the program directly from the file installed in the previous step, or ru
 
 to execute it from the project directory.
 
-# Usage
+## Usage
 
 pagerenc reads a series of commands from STDIN and writes 16-bit PCM output to
 STDOUT at a sample rate of 22050 Hz.
