@@ -1,0 +1,9 @@
+# Flex message defined twice, because multimon-ng doesn't pick up on the
+# first one. Instead, it uses the first one to synchronize with the FLEX
+# transmission clock, and then reads the second one.
+FLEX:30:Some Flex message
+FLEX:30:Some Flex message
+WAIT 5
+POCSAG2400:30:Some pocsag512 message
+POCSAG2400:35:Some pocsag2400 message
+POCSAG1200:8:Some pocsag1200 message

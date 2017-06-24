@@ -1,0 +1,29 @@
+name: pagerenc
+version: '0.1.0.0'
+synopsis: Encode fake pager messages for multimon-ng
+description: Please see README.md
+category: Web
+author: Galen Alderson
+maintainer: galen.alderson@gmail.com
+copyright: 2016 Galen Alderson
+license: BSD3
+homepage: https://github.com/unknownloner/pagerenc#readme
+ghc-options:
+- -Wall
+- -Wno-unused-do-bind
+dependencies:
+- base >=4.7 && <5
+- bytestring
+- random
+- optparse-applicative
+- megaparsec
+- scientific
+- split
+- free
+- mtl
+- writer-cps-transformers
+- recursion-schemes
+executables:
+  pagerenc:
+    main: Main.hs
+    source-dirs: src

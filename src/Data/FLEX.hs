@@ -6,7 +6,6 @@ import Data.Bits
 import Data.BitsExtra
 import qualified Data.ByteString.Builder as B
 import Data.ByteString.Builder (Builder)
-import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Lazy (ByteString)
 import Data.CRC
 import Data.List

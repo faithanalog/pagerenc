@@ -1,20 +1,20 @@
-module Main where
+module Main (main) where
 
-import Control.Monad
+import Control.Monad.Free.Church
+import Control.Monad.Trans.RWS.CPS
+import qualified Data.ByteString.Builder as ByteString.Builder
 import Data.ByteString.Lazy (ByteString)
-import Data.FLEX as FLEX
+import qualified Data.FLEX as FLEX
 import Data.Monoid
 import Data.PCM
-import Data.POCSAG as POCSAG
-import Data.Scientific
+import qualified Data.POCSAG as POCSAG
+import Data.Transmission
+import Data.TransmissionParser
 import Options.Applicative hiding (Failure, Parser, Success)
 import qualified Options.Applicative as Opt
 import System.IO
 import System.Random
-import Text.Megaparsec hiding (Message, option)
-import qualified Text.Megaparsec as P
-import Text.Megaparsec.Lexer hiding (space)
-import Text.Megaparsec.String
+import qualified Text.Megaparsec as Megaparsec
 
 -- multimon-ng's input sample rate
 outRate :: SampleRate
@@ -24,83 +24,43 @@ outRate = SampleRate 22050
 noiseAmplitude :: Double
 noiseAmplitude = 0.3
 
-data Message
-  = Transmission !ByteString
-                 !Bool
-  | Delay !Double
-  | RandDelay
-
--- Parse a message and generate a transmission from it
--- Messages can be either
--- FORMAT:ADDRESS:MESSAGE
--- WAIT
--- WAIT <LENGTH>
-message :: Parser Message
-message = wait <|> msg
-  where
-    wait :: Parser Message
-    wait = do
-      string "WAIT"
-      many $ oneOf " \t"
-      P.option RandDelay $ Delay . toRealFloat <$> number
-    msg :: Parser Message
-    msg = do
-      (tr, bd, delay) <- flex <|> pocsag
-      char ':'
-      address <- fromIntegral <$> integer
-      char ':'
-      message <- many $ noneOf "\r\n"
-      pure $
-        Transmission
-          (pcmEncode outRate (BaudRate bd) (tr address message))
-          delay
-    flex = do
-      string "FLEX"
-      pure (FLEX.transmission, 1600, False)
-    pocsag = do
-      string "POCSAG"
-      baud <-
-        choice
-          [ string "512" *> pure 512
-          , string "1200" *> pure 1200
-          , string "2400" *> pure 2400
-          ]
-      pure (POCSAG.transmission, baud, True)
-
-messages :: Parser [Message]
-messages = do
-  space
-  manyTill (message <* space) eof
-
 data Options = Options
   { optThrottle :: Bool
   , optMinDelay :: Double
   , optMaxDelay :: Double
   }
 
-encodeMessages :: Options -> IO ()
-encodeMessages opts = do
-  input <- getContents
-  case parse messages "" input of
-    Left err -> hPutStrLn stderr $ parseErrorPretty err
-    Right msgs -> mapM_ execMessage msgs
+runTransmission ::
+     RandomGen g => Options -> TransmissionM ByteString a -> g -> ByteString
+runTransmission opts tr g =
+  ByteString.Builder.toLazyByteString . snd $ evalRWS (iterM run tr) () g
   where
-    execMessage (Transmission bs delay) = do
-      put bs
-      when delay $ execMessage RandDelay
-    execMessage (Delay delayDuration) = do
-      noise <- noiseIO outRate noiseAmplitude delayDuration
-      put noise
-    execMessage RandDelay = do
-      delayDuration <- randomRIO (optMinDelay opts, optMaxDelay opts)
-      execMessage $ Delay delayDuration
-    -- Write samples to stdout
-    put
-      | optThrottle opts = throttledPut outRate
-      | otherwise = unthrottledPut
+    run (Transmit x m) = tell (ByteString.Builder.lazyByteString x) *> m
+    run (Noise x f) = state (pcmNoise outRate noiseAmplitude x) >>= f
+    run (RandDelayTime f) =
+      state (randomR (optMinDelay opts, optMaxDelay opts)) >>= f
+    run (Encode (Message t a m) f) =
+      f $ pcmEncode outRate (messageBaudRate t) (enc a m)
+      where
+        enc =
+          case t of
+            FLEX -> FLEX.transmission
+            POCSAG _ -> POCSAG.transmission
+
+
+encodeTransmission :: Options -> IO ()
+encodeTransmission opts = do
+  input <- getContents
+  case Megaparsec.parse transmission "" input of
+    Left err -> hPutStrLn stderr $ Megaparsec.parseErrorPretty err
+    Right x -> (runTransmission opts x <$> newStdGen) >>= write
+  where
+    write
+      | optThrottle opts = throttledWrite outRate
+      | otherwise = unthrottledWrite
 
 main :: IO ()
-main = execParser opts >>= encodeMessages
+main = execParser opts >>= encodeTransmission
   where
     opts =
       info
