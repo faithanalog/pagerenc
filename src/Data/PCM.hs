@@ -17,7 +17,6 @@ import System.IO
 import System.Random
 import Data.Semigroup
 import qualified Data.Resample
-import qualified Data.List as List
 import Control.Monad
 
 
@@ -37,7 +36,8 @@ pcmEncode (SampleRate sr) (BaudRate br) =
     sampleFor True = -maxBound
     sampleFor False = maxBound
     encodeBit = B.int16LE . sampleFor
-    uncons r f xs = maybe r (uncurry f . first encodeBit) $ List.uncons xs
+    uncons r _ [] = r
+    uncons _ f (x:xs) = f (encodeBit x) xs
 
 -- Generate random pcmNoise. This is used instead of pure silence because
 -- multimon-ng detects silence as if it was a signal, while it ignores pcmNoise

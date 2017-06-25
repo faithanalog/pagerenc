@@ -25,8 +25,8 @@ data Resample a
 -- with both indices at 0 is equivalent to continuing on. This is done to
 -- prevent integer overflows in long data streams.
 --
--- The Next/Yield actions recursively consumed using a continuation passing
--- style, in such a way that once the input data is exhausted, the loop will
+-- The Next/Yield actions are recursively consumed using a continuation passing
+-- style in such a way that once the input data is exhausted, the loop will
 -- terminate and return mempty.
 resample ::
      Monoid m
