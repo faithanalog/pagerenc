@@ -26,7 +26,7 @@ data Resample a
 -- prevent integer overflows in long data streams.
 --
 -- The Next/Yield actions recursively consumed using a continuation passing
--- style, in uch a way that once the input data is exhausted, the loop will
+-- style, in such a way that once the input data is exhausted, the loop will
 -- terminate and return mempty.
 resample ::
      Monoid m

@@ -9,7 +9,6 @@ module Data.PCM
 
 import Control.Concurrent
 import Data.Bifunctor
-import Data.BitsExtra
 import qualified Data.ByteString.Builder as B
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Lazy as B
@@ -19,7 +18,6 @@ import System.Random
 import Data.Semigroup
 import qualified Data.Resample
 import qualified Data.List as List
-import Data.Foldable
 
 
 newtype SampleRate = SampleRate
@@ -45,14 +43,18 @@ pcmEncode (SampleRate sr) (BaudRate br) =
 -- Generate random pcmNoise. This is used instead of pure silence because
 -- multimon-ng detects silence as if it was a signal, while it ignores pcmNoise
 pcmNoise :: RandomGen g => SampleRate -> Double -> Double -> g -> (Builder, g)
-pcmNoise (SampleRate sr) amplitude duration = samples
+pcmNoise (SampleRate sr) amplitude duration = noise B.int16LE (lo, hi) len
   where
     hi = floor $ amplitude * 32767
     lo = -hi
-    len = round $ duration * fromIntegral sr :: Int
-    samples g = gen (mempty, g)
-    Endo gen =
-      stimesMonoid len . Endo $ \x -> x >>= (first B.int16LE . randomR (lo, hi))
+    len = round $ duration * fromIntegral sr
+
+-- | Generate n values within a range, combining them with a function mapping
+-- to a monoid. This makes use of the Monad instance for (,)
+noise :: (RandomGen g, Random a, Monoid m) => (a -> m) -> (a, a) -> Int -> g -> (m, g)
+noise m range n g =
+  flip appEndo (mempty, g) . stimesMonoid n $
+  Endo (>>= (first m . randomR range))
 
 -- Limits the rate at which samples are calculated to yield data as if it was
 -- being FM decoded in real time. This does technically output slightly slower
