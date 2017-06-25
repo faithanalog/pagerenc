@@ -1,8 +1,8 @@
 module Data.PCM
   ( pcmEncode
   , pcmNoise
-  , throttledWrite
-  , unthrottledWrite
+  , throttledPutStr
+  , writeSamples
   , SampleRate(..)
   , BaudRate(..)
   ) where
@@ -18,6 +18,7 @@ import System.Random
 import Data.Semigroup
 import qualified Data.Resample
 import qualified Data.List as List
+import Control.Monad
 
 
 newtype SampleRate = SampleRate
@@ -60,23 +61,21 @@ noise m range n g =
 -- being FM decoded in real time. This does technically output slightly slower
 -- than it should, because write-time is not accounted for when calculating
 -- sleep delays.
-throttledWrite :: SampleRate -> ByteString -> IO ()
-throttledWrite (SampleRate sr) = writeSamples
+throttledPutStr :: SampleRate -> ByteString -> IO ()
+throttledPutStr (SampleRate sr) samples = do
+  B.putStr samples
+  hFlush stdout
+  threadDelay sleepTime
+  where
+    numSamples = fromIntegral (B.length samples `div` 2) -- 2 bytes per sample
+    sleepTime = 1000000 * numSamples `div` sr -- (1000000 us / sec) * (1 sec / sr smpls) * (numSamples smpls / chunk)
+
+-- | Write chunks using a caller-supplied write function, allowing the caller
+-- to insert delays, etc.
+writeSamples :: Applicative f => (ByteString -> f ()) -> ByteString -> f ()
+writeSamples write samples =
+  unless (B.null samples) $ write h *> writeSamples write t
   where
     chunkSize = 4096
-    chunkSizeBytes = chunkSize * 2 -- 2 bytes per sample
-    -- (1000000 us / sec) * (1 sec / sr smpls) * (chunkSize smpls / chunk)
-    sleepTime = 1000000 * chunkSize `div` sr
-    writeSamples samples
-      | B.null samples = pure ()
-      | otherwise = do
-        unthrottledWrite h
-        hFlush stdout
-        threadDelay sleepTime
-        writeSamples t
-      where
-        (h, t) = B.splitAt (fromIntegral chunkSizeBytes) samples
-
--- Output samples as fast as we can
-unthrottledWrite :: ByteString -> IO ()
-unthrottledWrite = B.putStr
+    (h, t) = B.splitAt chunkSize samples
+    

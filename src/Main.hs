@@ -4,6 +4,7 @@ import Control.Monad.Free.Church
 import Control.Monad.Trans.RWS.CPS
 import qualified Data.ByteString.Builder as ByteString.Builder
 import Data.ByteString.Builder (Builder)
+import qualified Data.ByteString.Lazy as ByteString
 import Data.Monoid
 import Data.PCM
 import Data.Transmission
@@ -46,8 +47,8 @@ encodeTransmission opts = do
     Right x -> (runTransmission opts x <$> newStdGen) >>= (write . ByteString.Builder.toLazyByteString)
   where
     write
-      | optThrottle opts = throttledWrite outRate
-      | otherwise = unthrottledWrite
+      | optThrottle opts = writeSamples (throttledPutStr outRate)
+      | otherwise = writeSamples ByteString.putStr
 
 main :: IO ()
 main = execParser opts >>= encodeTransmission
