@@ -30,16 +30,14 @@ newtype BaudRate = BaudRate
   }
 
 -- Encode bits as a series of 2-level PCM samples
-pcmEncode :: Foldable t => SampleRate -> BaudRate -> t Bool -> Builder
+pcmEncode :: SampleRate -> BaudRate -> [Bool] -> Builder
 pcmEncode (SampleRate sr) (BaudRate br) =
-  Data.Resample.resample uncons symRate sr . foldMap encodeBit
+  Data.Resample.resample uncons br sr
   where
-    symRate = 38400
     sampleFor True = -maxBound
     sampleFor False = maxBound
-    sampleRepeats = symRate `div` br
-    encodeBit = replicate sampleRepeats . B.int16LE . sampleFor
-    uncons r f xs = maybe r (uncurry f) $ List.uncons xs
+    encodeBit = B.int16LE . sampleFor
+    uncons r f xs = maybe r (uncurry f . first encodeBit) $ List.uncons xs
 
 -- Generate random pcmNoise. This is used instead of pure silence because
 -- multimon-ng detects silence as if it was a signal, while it ignores pcmNoise

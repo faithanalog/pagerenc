@@ -32,7 +32,9 @@ sendMessage =
     addr <- intLit
     void colon
     msg <- manyTill anyChar . lookAhead $ void newlineChar
-    pure $ encode (Message mType addr msg) >>= transmit
+    pure $ do
+      encode (Message mType addr msg) >>= transmit
+      unless (mType == FLEX) $ randDelayTime >>= noise >>= transmit
 
 delay :: Parser (TransmissionM w ())
 delay = do
