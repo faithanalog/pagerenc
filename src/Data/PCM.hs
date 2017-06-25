@@ -36,8 +36,8 @@ pcmEncode (SampleRate sr) (BaudRate br) =
     sampleFor True = -maxBound
     sampleFor False = maxBound
     encodeBit = B.int16LE . sampleFor
-    uncons r _ [] = r
-    uncons _ f (x:xs) = f (encodeBit x) xs
+    uncons [] _ = mempty
+    uncons (x:xs) f = f (encodeBit x) xs
 
 -- Generate random pcmNoise. This is used instead of pure silence because
 -- multimon-ng detects silence as if it was a signal, while it ignores pcmNoise
