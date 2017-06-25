@@ -3,6 +3,7 @@ module Data.Transmission
   ( MessageType(..)
   , Message(..)
   , messageBaudRate
+  , pcmEncodeMessage
   , POCSAGBaudRate(..)
   , pocsagBaudRate
   , Transmission(..)
@@ -14,8 +15,11 @@ module Data.Transmission
   ) where
 
 import Control.Monad.Free.Church
-import Data.Word
+import Data.ByteString.Builder (Builder)
+import qualified Data.FLEX as FLEX
 import Data.PCM
+import qualified Data.POCSAG as POCSAG
+import Data.Word
 
 data POCSAGBaudRate
   = POCSAGBaudRate512
@@ -42,6 +46,13 @@ data Message = Message
   , msgAddr :: Word32
   , msgContents :: String
   } deriving (Eq, Read, Show)
+
+pcmEncodeMessage :: SampleRate -> Message -> Builder
+pcmEncodeMessage outRate (Message t a m) =
+  pcmEncode outRate (messageBaudRate t) (enc t a m)
+  where
+    enc FLEX = FLEX.transmission
+    enc (POCSAG _) = POCSAG.transmission
 
 data Transmission w a =
   Transmit w a

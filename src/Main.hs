@@ -3,11 +3,9 @@ module Main (main) where
 import Control.Monad.Free.Church
 import Control.Monad.Trans.RWS.CPS
 import qualified Data.ByteString.Builder as ByteString.Builder
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.FLEX as FLEX
+import Data.ByteString.Builder (Builder)
 import Data.Monoid
 import Data.PCM
-import qualified Data.POCSAG as POCSAG
 import Data.Transmission
 import Data.TransmissionParser
 import Options.Applicative hiding (Failure, Parser, Success)
@@ -31,29 +29,21 @@ data Options = Options
   }
 
 runTransmission ::
-     RandomGen g => Options -> TransmissionM ByteString a -> g -> ByteString
-runTransmission opts tr g =
-  ByteString.Builder.toLazyByteString . snd $ evalRWS (iterM run tr) () g
+     RandomGen g => Options -> TransmissionM Builder a -> g -> Builder
+runTransmission opts tr g = snd $ evalRWS (iterM run tr) () g
   where
-    run (Transmit x m) = tell (ByteString.Builder.lazyByteString x) *> m
+    run (Transmit x f) = tell x *> f
     run (Noise x f) = state (pcmNoise outRate noiseAmplitude x) >>= f
     run (RandDelayTime f) =
       state (randomR (optMinDelay opts, optMaxDelay opts)) >>= f
-    run (Encode (Message t a m) f) =
-      f $ pcmEncode outRate (messageBaudRate t) (enc a m)
-      where
-        enc =
-          case t of
-            FLEX -> FLEX.transmission
-            POCSAG _ -> POCSAG.transmission
-
+    run (Encode x f) = f $ pcmEncodeMessage outRate x
 
 encodeTransmission :: Options -> IO ()
 encodeTransmission opts = do
   input <- getContents
   case Megaparsec.parse transmission "" input of
     Left err -> hPutStrLn stderr $ Megaparsec.parseErrorPretty err
-    Right x -> (runTransmission opts x <$> newStdGen) >>= write
+    Right x -> (runTransmission opts x <$> newStdGen) >>= (write . ByteString.Builder.toLazyByteString)
   where
     write
       | optThrottle opts = throttledWrite outRate

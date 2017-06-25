@@ -1,9 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
 module Data.Resample (resample) where  
 
-import Data.Functor.Foldable
 import Data.Ratio
 import Data.Monoid
+
+-- | This is the Hylomorphism from the recursion-schemes package,
+-- re-implemeneted to avoid dependening on the entirety of recursion-schemes.
+hylo :: Functor f => (f b -> b) -> (a -> f a) -> a -> b
+hylo f g = f . fmap (hylo f g) . g
   
 data Resample a
   = Done
@@ -58,7 +62,6 @@ runResampler uncons r g xs =
     Done -> g xs
     Next f -> flip (uncons mempty) xs $ \_ t -> f g t
     Yield f -> flip (uncons mempty) xs $ \h _ -> h <> f g xs
-
 
 simplify :: Int -> Int -> (Int, Int)
 simplify n d = (numerator r, denominator r)

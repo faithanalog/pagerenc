@@ -4,15 +4,9 @@ module Data.POCSAG
 
 import Data.Bits
 import Data.BitsExtra
-import qualified Data.ByteString.Builder as B
-import Data.ByteString.Builder (Builder)
-import Data.ByteString.Lazy (ByteString)
-import Data.CRC
 import Data.List.Split
 import Data.Word
-
--- Fully encoded codeword with CRC added
-newtype Codeword = Codeword { getCodeword :: Word32 }
+import Data.Codeword
 
 -- POCSAG constants
 
@@ -57,16 +51,6 @@ batchSize :: Int
 batchSize = 16
 
 
-codewordBE :: Codeword -> Builder
-codewordBE (Codeword x) = B.word32BE x
-
--- Takes the 21 bit data segment of a codeword and adds the CRC and parity
--- error correction codes
-codeword :: Word32 -> Codeword
-codeword x = Codeword $ shiftL fullCRC 1 .|. parityBit fullCRC
-  where
-    fullCRC = shiftL x crcLength .|. crc x
-
 -- Encode an ASCII message to a series of codewords
 encodeASCII :: String -> [Codeword]
 encodeASCII = map mkCodeword . chunksOf msgSize . concatMap charToBits
@@ -74,8 +58,8 @@ encodeASCII = map mkCodeword . chunksOf msgSize . concatMap charToBits
     charToBits = toBitsLE 7 . (fromIntegral :: Int -> Word8) . fromEnum
     mkCodeword bs = codeword $ msgFlag .|. fromBitsBE msgSize bs
 
-transmission :: Word32 -> String -> ByteString
-transmission addr txt = toBytes $ preamble ++ insertSyncs trData
+transmission :: Word32 -> String -> [Bool]
+transmission addr txt = toBits $ preamble ++ insertSyncs trData
   where
     addrFrameNum = fromIntegral $ addr .&. 0x7
     addrWord = codeword $ shiftL (shiftR addr 3) 2 .|. textFlag .|. addrFlag
@@ -88,4 +72,4 @@ transmission addr txt = toBytes $ preamble ++ insertSyncs trData
         ]
     -- Insert syncs between batches
     insertSyncs = concatMap (sync :) . chunksOf batchSize
-    toBytes = B.toLazyByteString . mconcat . map codewordBE
+    toBits = foldMap (toBitsBE 32 . getCodeword)

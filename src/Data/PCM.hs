@@ -11,12 +11,15 @@ import Control.Concurrent
 import Data.Bifunctor
 import Data.BitsExtra
 import qualified Data.ByteString.Builder as B
+import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Lazy (ByteString)
 import System.IO
 import System.Random
 import Data.Semigroup
 import qualified Data.Resample
+import qualified Data.List as List
+import Data.Foldable
 
 
 newtype SampleRate = SampleRate
@@ -27,35 +30,22 @@ newtype BaudRate = BaudRate
   { getBaudRate :: Int
   }
 
-resamplePCM :: SampleRate -> SampleRate -> ByteString -> ByteString
-resamplePCM (SampleRate src) (SampleRate dst) =
-  B.toLazyByteString . Data.Resample.resample takeSample src dst
-  where
-    takeSample r f xs =
-      maybe r (uncurry f) $ do
-        (a, ta) <- B.uncons xs
-        (b, tb) <- B.uncons ta
-        pure $ (B.word8 a <> B.word8 b, tb)
-
--- Encode data as a series of 2-level PCM samples
-pcmEncode :: SampleRate -> BaudRate -> ByteString -> ByteString
+-- Encode bits as a series of 2-level PCM samples
+pcmEncode :: Foldable t => SampleRate -> BaudRate -> t Bool -> Builder
 pcmEncode (SampleRate sr) (BaudRate br) =
-  resamplePCM (SampleRate symRate) (SampleRate sr) . B.toLazyByteString .
-  foldMap encodeWord . B.unpack
+  Data.Resample.resample uncons symRate sr . foldMap encodeBit
   where
     symRate = 38400
     sampleFor True = -maxBound
     sampleFor False = maxBound
     sampleRepeats = symRate `div` br
-    encodeBit = stimesMonoid sampleRepeats . B.int16LE . sampleFor
-    encodeWord = foldMap encodeBit . toBitsBE 8
-
+    encodeBit = replicate sampleRepeats . B.int16LE . sampleFor
+    uncons r f xs = maybe r (uncurry f) $ List.uncons xs
 
 -- Generate random pcmNoise. This is used instead of pure silence because
 -- multimon-ng detects silence as if it was a signal, while it ignores pcmNoise
-pcmNoise :: RandomGen g => SampleRate -> Double -> Double -> g -> (ByteString, g)
-pcmNoise (SampleRate sr) amplitude duration =
-  first B.toLazyByteString . samples
+pcmNoise :: RandomGen g => SampleRate -> Double -> Double -> g -> (Builder, g)
+pcmNoise (SampleRate sr) amplitude duration = samples
   where
     hi = floor $ amplitude * 32767
     lo = -hi

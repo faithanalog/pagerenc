@@ -22,7 +22,6 @@ dependencies:
 - free
 - mtl
 - writer-cps-transformers
-- recursion-schemes
 executables:
   pagerenc:
     main: Main.hs
