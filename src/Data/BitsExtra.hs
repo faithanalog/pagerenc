@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 module Data.BitsExtra
   ( toBitsBE
   , toBitsLE
@@ -26,9 +28,8 @@ toBitsLE n x =
     0
 
 fromBitsBE :: (Bits b, Num b) => Int -> [Bool] -> b
-fromBitsBE n =
-  snd .
-  foldl' (\(i, x) b -> (i - 1, x .|. shiftL (bitFor b) i)) (n - 1, 0) . take n
+fromBitsBE n xs =
+  foldl' (.|.) 0 $ zipWith (\i b -> shiftL (from b) i) [n - 1, n - 2 .. 0] xs
   where
-    bitFor True = 1
-    bitFor False = 0
+    from True = 1
+    from False = 0
