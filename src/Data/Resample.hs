@@ -1,7 +1,8 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE RankNTypes #-}
 module Data.Resample (resample) where  
 
 import Data.Ratio
-import Data.Semigroup
 
 -- | Resample using a nearest-neighbor-ish method
 --
@@ -17,21 +18,30 @@ import Data.Semigroup
 -- termination: The uncons can return a terminating element rather than
 -- applying the supplied continuation to stop resampling. Generally this
 -- is done once the end of input is reached.
-resample ::
-     Semigroup m
-  => (t -> (m -> t -> m) -> m)
-  -> Int
-  -> Int
-  -> t
-  -> m
-resample uncons src dst = go 0 0
+
+data Resample x a
+  = Stop
+  | Await a
+  | Yield x
+          a
+  deriving (Functor)
+
+resample :: Monoid m => (t -> Maybe (m, t)) -> Int -> Int -> t -> m
+resample uncons src dst input = hylo (0, 0, input)
   where
     (l, m) = simplify src dst
     outIndex x = x * l `div` m
-    go i o xs
-      | outIndex o > i = uncons xs $ \_ t -> go (i + 1) o t
-      | o == m = go 0 0 xs
-      | otherwise = uncons xs $ \h _ -> h <> go i (o + 1) xs
+    hylo = phi . fmap hylo . psi
+    psi (i, o, xs) =
+      case uncons xs of
+        Nothing -> Stop
+        Just (h, t)
+          | outIndex o > i -> Await (i + 1, o, t)
+          | o == m -> Await (0, 0, xs)
+          | otherwise -> Yield h (i, o + 1, xs)
+    phi Stop = mempty
+    phi (Await xs) = xs
+    phi (Yield x xs) = mappend x xs
 
 simplify :: Int -> Int -> (Int, Int)
 simplify n d = (numerator r, denominator r)
