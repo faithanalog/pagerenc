@@ -31,10 +31,8 @@ sendMessage =
     void colon
     addr <- intLit
     void colon
-    msg <- manyTill anyChar . lookAhead $ void newlineChar
-    pure $ do
-      encode (Message mType addr msg) >>= transmit
-      unless (mType == FLEX) $ randDelayTime >>= noise >>= transmit
+    msg <- many notNewlineChar
+    pure $ encode (Message mType addr msg) >>= transmit
 
 delay :: Parser (TransmissionM w ())
 delay = do
@@ -60,6 +58,9 @@ whitespaceChar = satisfy $ \c -> c /= '\r' && c /= '\n' && isSpace c
 
 newlineChar :: Parser Char
 newlineChar = satisfy $ \c -> c == '\r' || c == '\n'
+
+notNewlineChar :: Parser Char
+notNewlineChar = satisfy $ \c -> c /= '\r' && c /= '\n'
 
 lineSep :: Parser ()
 lineSep = lexeme $ skipMany newlineChar

@@ -55,11 +55,10 @@ Here's an example.
     WAIT 30
     POCSAG1200:8:Some pocsag1200 message
 
-POCSAG messages have a delay automatically inserted after them, while FLEX
-messages do not, due to the multimon FLEX encoder relying on FLEX messages
-being aligned next to each other to decode properly. Additionally, multimon will
-not decode the first FLEX message sent in a batch of FLEX messages. It uses the
-first message to synchronize the decoder, so it can't decode that message.
+multimon-ng will not decode the first FLEX message sent in a batch of FLEX
+messages. It uses the first message to synchronize the decoder, so it can't
+decode that message. Any non-FLEX transmission immediately following a FLEX
+messages ends the FLEX batch. This inclueds WAITs, and POCSAG messages.
 
 When WAIT is not provided any parameters, it will insert a random delay between
 MINDELAY and MAXDELAY, specifiable with command line flags. The default min and
