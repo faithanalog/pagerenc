@@ -15,18 +15,12 @@ import System.IO
 import System.Random
 import qualified Text.Megaparsec as Megaparsec
 
--- multimon-ng's input sample rate
-outRate :: SampleRate
-outRate = SampleRate 22050
-
--- Amplitude for random noise between broadcasts
-noiseAmplitude :: Double
-noiseAmplitude = 0.3
-
 data Options = Options
   { optThrottle :: Bool
   , optMinDelay :: Double
   , optMaxDelay :: Double
+  , optNoiseVolume :: Double
+  , optSampleRate :: SampleRate
   }
 
 runTransmission ::
@@ -34,20 +28,23 @@ runTransmission ::
 runTransmission opts tr g = snd $ evalRWS (iterM run tr) () g
   where
     run (Transmit x f) = tell x *> f
-    run (Noise x f) = state (pcmNoise outRate noiseAmplitude x) >>= f
+    run (Noise x f) =
+      state (pcmNoise (optSampleRate opts) (optNoiseVolume opts) x) >>= f
     run (RandDelayTime f) =
       state (randomR (optMinDelay opts, optMaxDelay opts)) >>= f
-    run (Encode x f) = f $ pcmEncodeMessage outRate x
+    run (Encode x f) = f $ pcmEncodeMessage (optSampleRate opts) x
 
 encodeTransmission :: Options -> IO ()
 encodeTransmission opts = do
   input <- getContents
   case Megaparsec.parse transmission "" input of
     Left err -> hPutStrLn stderr $ Megaparsec.parseErrorPretty err
-    Right x -> (runTransmission opts x <$> newStdGen) >>= (write . ByteString.Builder.toLazyByteString)
+    Right x ->
+      (runTransmission opts x <$> newStdGen) >>=
+      (write . ByteString.Builder.toLazyByteString)
   where
     write
-      | optThrottle opts = writeSamples (throttledPutStr outRate)
+      | optThrottle opts = writeSamples (throttledPutStr (optSampleRate opts))
       | otherwise = writeSamples ByteString.putStr
 
 main :: IO ()
@@ -71,15 +68,25 @@ options =
      help "Throttle data output to 22050Hz, causing 'realtime' playback.") <*>
   option
     auto
-    (long "mindelay" <>
-     help "Set minimum delay between messages in seconds." <>
+    (long "mindelay" <> help "Set minimum delay between messages in seconds." <>
      metavar "NUM" <>
      value 1.0 <>
      showDefault) <*>
   option
     auto
-    (long "maxdelay" <>
-     help "Set maximum delay between messages in seconds." <>
+    (long "maxdelay" <> help "Set maximum delay between messages in seconds." <>
      metavar "NUM" <>
      value 10.0 <>
-     showDefault)
+     showDefault) <*>
+  option
+    auto
+    (long "noisevolume" <> help "Set volume of noise inserted between messages." <>
+     metavar "NUM" <>
+     value 0.3 <>
+     showDefault) <*>
+  option
+    (fmap SampleRate auto)
+    (long "samplerate" <> help "Set sample rate of output data." <>
+     metavar "INT" <>
+     value (SampleRate 22050) <>
+     showDefaultWith (\(SampleRate x) -> show x))
