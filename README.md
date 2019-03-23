@@ -40,6 +40,14 @@ to execute it from the project directory.
 pagerenc reads a series of commands from STDIN and writes 16-bit PCM output to
 STDOUT at a sample rate of 22050 Hz.
 
+To make a wav file instead, try something like this (requires ffmpeg):
+
+    cat pager_commands | pagerenc | ffmpeg -f pcm_s16le -ar 22050 -i - -ar 44100 output.wav
+
+To encode a single message, you could do this
+
+    echo 'FLEX:ID:Message' | pagerenc | ffmpeg -f pcm_s16le -ar 22050 -i - -ar 44100 output.wav
+
 Each line may contain either a message to be encoded in a specific format, or
 a delay command to insert noise of an optionally specified duration. Valid
 formats are POCSAG512, POCSAG1200, POCSAG2400, and FLEX. Messages are in the
