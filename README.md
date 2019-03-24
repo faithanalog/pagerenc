@@ -42,11 +42,11 @@ STDOUT at a sample rate of 22050 Hz.
 
 To make a wav file instead, try something like this (requires ffmpeg):
 
-    cat pager_commands | pagerenc | ffmpeg -f pcm_s16le -ar 22050 -ac 1 -i - -ar 44100 output.wav
+    cat pager_commands | pagerenc | ffmpeg -f s16le -ar 22050 -ac 1 -i - -ar 44100 output.wav
 
 To encode a single message, you could do this
 
-    echo 'FLEX:ID:Message' | pagerenc | ffmpeg -f pcm_s16le -ar 22050 -ac 1 -i - -ar 44100 output.wav
+    echo 'FLEX:ID:Message' | pagerenc | ffmpeg -f s16le -ar 22050 -ac 1 -i - -ar 44100 output.wav
 
 Each line may contain either a message to be encoded in a specific format, or
 a delay command to insert noise of an optionally specified duration. Valid
